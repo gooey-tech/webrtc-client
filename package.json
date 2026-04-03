@@ -3,20 +3,42 @@
   "version": "1.0.0",
   "description": "WebRTC client for gooey-tech signaling server",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean",
+    "prepublishOnly": "npm run build",
+    "prepack": "npm run build",
+    "example:build": "esbuild example/client.ts --bundle --outfile=example/bundle.js --platform=browser --format=iife --define:global=globalThis --inject:example/shims.js",
+    "example:dev": "esbuild example/client.ts --bundle --outfile=example/bundle.js --platform=browser --format=iife --define:global=globalThis --inject:example/shims.js --watch --servedir=example"
   },
-  "keywords": ["webrtc", "simple-peer", "socket.io", "signaling"],
+  "keywords": [
+    "webrtc",
+    "simple-peer",
+    "socket.io",
+    "signaling"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gooey-tech/webrtc-client.git"
+  },
   "dependencies": {
     "simple-peer": "^9.11.1",
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
     "@types/simple-peer": "^9.11.8",
+    "esbuild": "^0.28.0",
+    "events": "^3.3.0",
+    "process": "^0.11.10",
     "typescript": "^5.3.3"
   },
   "engines": {

@@ -116,6 +116,29 @@ When `autoAccept` is `true` (default), incoming peer signals automatically creat
 | `connectionState` | `ConnectionState` | Current derived state |
 | `isConnected` | `boolean` | `true` when peer is connected |
 
+## Running the Example
+
+A browser-based demo is included in `example/`. It uses the `WebRTCClient` class directly, bundled with esbuild.
+
+```bash
+# Build and serve with live reload
+npm run example:dev
+```
+
+This opens a dev server at `http://localhost:8000`. To test peer-to-peer:
+
+1. Open two browser tabs to `http://localhost:8000`
+2. In both tabs, set the signaling server URL (e.g. `https://signaling-server-jr8j.onrender.com`) and click **Connect**
+3. Copy the **My Socket ID** from one tab into the **Remote Socket ID** field of the other
+4. Click **Connect to Peer** — both tabs should transition to `PEER:CONNECTED`
+5. Type a message and hit **Send** — it arrives on the other tab over the WebRTC data channel
+
+To build the example without serving:
+
+```bash
+npm run example:build
+```
+
 ## Signaling Server
 
 This client is built for [gooey-tech/signaling-server](https://github.com/gooey-tech/signaling-server) — a minimal Socket.io relay that forwards `signal` events between peers by socket ID. No rooms, no lobby, just direct relay.
