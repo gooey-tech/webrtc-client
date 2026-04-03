@@ -1,4 +1,4 @@
-import { WebRTCClient, ConnectionState } from '../src';
+import { WebRTCClient, ConnectionState, type WebRTCState } from '../src';
 
 type TagName<S extends string> =
   S extends `${infer T}#${string}` ? T :
@@ -38,47 +38,34 @@ const appendLog = (message: string, level = 'info') => {
 
 let client: WebRTCClient | null = null;
 
-const setStatus = (state: string) => {
-  elements.status.dataset.state = state;
-  elements.status.textContent = state;
-};
+const renderState = (state: WebRTCState) => {
+  const { connectionState, signalingState, peerState, socketId } = state;
 
-const resetUI = () => {
-  elements.myId.value = '';
-  elements.connectButton.disabled = false;
-  elements.disconnectButton.disabled = true;
-  elements.peerButton.disabled = true;
-  elements.dropPeerButton.disabled = true;
-  elements.sendButton.disabled = true;
+  elements.status.dataset.state = connectionState;
+  elements.status.textContent = connectionState;
+
+  elements.myId.value = socketId ?? '';
+
+  const signalingUp = signalingState === 'connected';
+  const hasPeer = peerState === 'connecting' || peerState === 'connected';
+
+  elements.connectButton.disabled = signalingUp;
+  elements.disconnectButton.disabled = !signalingUp;
+  elements.peerButton.disabled = !signalingUp || hasPeer;
+  elements.dropPeerButton.disabled = !hasPeer;
+  elements.sendButton.disabled = peerState !== 'connected';
 };
 
 const wireClient = (c: WebRTCClient) => {
+  c.on('stateChange', renderState);
+
   c.on('connectionStateChange', (state) => {
-    setStatus(state);
     appendLog(`State: ${state}`);
   });
 
   c.on('signalingStateChange', (state) => {
     if (state === 'connected') {
-      elements.myId.value = c.socketId ?? '';
-      elements.connectButton.disabled = true;
-      elements.disconnectButton.disabled = false;
-      elements.peerButton.disabled = false;
       appendLog(`Socket ID: ${c.socketId}`, 'ok');
-    }
-    if (state === 'disconnected') {
-      resetUI();
-    }
-  });
-
-  c.on('peerStateChange', (state) => {
-    const hasPeer = state === 'connecting' || state === 'connected';
-    elements.peerButton.disabled = hasPeer;
-    elements.dropPeerButton.disabled = !hasPeer;
-    elements.sendButton.disabled = state !== 'connected';
-
-    if (state === 'idle') {
-      elements.peerButton.disabled = false;
     }
   });
 
@@ -117,8 +104,6 @@ elements.connectButton.addEventListener('click', () => {
 elements.disconnectButton.addEventListener('click', () => {
   client?.destroy();
   client = null;
-  setStatus(ConnectionState.IDLE);
-  resetUI();
   appendLog('Disconnected');
 });
 

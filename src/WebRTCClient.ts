@@ -251,8 +251,11 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
     });
 
     this.peer.on('error', (err: Error) => {
-      this.setState({ peerState: 'error', error: err });
-      this.emit('error', err);
+      const isAbort = /close called|user-initiated abort/i.test(err.message);
+      if (!isAbort) {
+        this.setState({ peerState: 'error', error: err });
+        this.emit('error', err);
+      }
     });
   }
 
