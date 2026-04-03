@@ -75,6 +75,11 @@ interface SignalPayload {
   signal: SimplePeer.SignalData;
 }
 
+/** `simple-peer` does not expose `_channel` on its public type. */
+type SimplePeerWithChannel = SimplePeer.Instance & {
+  _channel?: RTCDataChannel | null;
+};
+
 // ---------------------------------------------------------------------------
 // Typed emitter helper
 // ---------------------------------------------------------------------------
@@ -269,9 +274,7 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
       });
     });
 
-    this.peer.on('connect', () => {
-      this.setState({ peerState: 'connected' });
-    });
+    this.bindPeerTransportReady(this.peer);
 
     this.peer.on('data', (data: Uint8Array) => {
       this.emit('data', data);
@@ -295,6 +298,44 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
         this.emit('error', err);
       }
     });
+  }
+
+  /**
+   * Marks the peer as connected when either simple-peer's `connect` fires or the
+   * underlying data channel reaches `open` (whichever happens first). Helps stacks
+   * where one signal is reliable but the other is not.
+   */
+  private bindPeerTransportReady(peer: SimplePeer.Instance): void {
+    const markReady = () => {
+      if (this.peer !== peer || this._state.peerState !== 'connecting') return;
+      this.setState({ peerState: 'connected' });
+    };
+
+    peer.on('connect', markReady);
+
+    const attachToChannel = (channel: RTCDataChannel) => {
+      if (channel.readyState === 'open') {
+        markReady();
+      } else {
+        channel.addEventListener('open', markReady, { once: true });
+      }
+    };
+
+    let retries = 0;
+    const maxChannelLookupRetries = 80;
+
+    const tryBindChannel = () => {
+      if (this.peer !== peer) return;
+      const channel = (peer as SimplePeerWithChannel)._channel;
+      if (channel) {
+        attachToChannel(channel);
+        return;
+      }
+      if (retries++ >= maxChannelLookupRetries) return;
+      queueMicrotask(tryBindChannel);
+    };
+
+    tryBindChannel();
   }
 
   private handleIncomingSignal(data: SignalPayload): void {

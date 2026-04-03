@@ -69,6 +69,8 @@ The client exposes two independent state axes and one derived composite:
 
 `idle` | `connecting` | `connected` | `destroyed` | `error`
 
+`peerState` becomes `connected` when **either** simple-peer emits `connect` **or** the underlying `RTCDataChannel` reaches `open` (whichever happens first).
+
 **Peer failures (recoverable):** When the `simple-peer` instance errors (other than a user-abort teardown), the client emits `error` with the `Error`, destroys the peer, and sets `peerState` back to `idle` while leaving signaling connected. The composite `ConnectionState` returns to `SIGNALING_CONNECTED` so you can call `connectToPeer` again without manually calling `disconnectPeer()` first.
 
 ## API
