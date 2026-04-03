@@ -1,13 +1,26 @@
 import { EventEmitter } from 'events';
-import { io, Socket } from 'socket.io-client';
 import SimplePeer from 'simple-peer';
+import { io, Socket } from 'socket.io-client';
+import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type SignalingState = 'disconnected' | 'connecting' | 'connected' | 'error';
-export type PeerState = 'idle' | 'connecting' | 'connected' | 'destroyed' | 'error';
+/** Options passed to [socket.io-client `io()`](https://socket.io/docs/v4/client-options/). */
+export type SocketIoClientOptions = Partial<ManagerOptions & SocketOptions>;
+
+export type SignalingState =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'error';
+export type PeerState =
+  | 'idle'
+  | 'connecting'
+  | 'connected'
+  | 'destroyed'
+  | 'error';
 
 export enum ConnectionState {
   IDLE = 'idle',
@@ -33,6 +46,16 @@ export interface WebRTCClientConfig {
   peerOptions?: SimplePeer.Options;
   /** When true (default), automatically create an answerer peer on incoming signal. */
   autoAccept?: boolean;
+  /**
+   * Merged into socket.io-client options. Default keeps `transports: ['websocket']`
+   * unless you override `transports`.
+   */
+  socketOptions?: SocketIoClientOptions;
+  /**
+   * Called right after `SimplePeer` is constructed, before listeners are attached.
+   * Use to patch the underlying `RTCPeerConnection` (e.g. React Native `getStats`).
+   */
+  onPeerCreated?: (peer: SimplePeer.Instance) => void;
 }
 
 export interface WebRTCClientEvents {
@@ -62,7 +85,10 @@ declare interface TypedEmitter {
   on<K extends EventKey>(event: K, listener: WebRTCClientEvents[K]): this;
   once<K extends EventKey>(event: K, listener: WebRTCClientEvents[K]): this;
   off<K extends EventKey>(event: K, listener: WebRTCClientEvents[K]): this;
-  emit<K extends EventKey>(event: K, ...args: Parameters<WebRTCClientEvents[K]>): boolean;
+  emit<K extends EventKey>(
+    event: K,
+    ...args: Parameters<WebRTCClientEvents[K]>
+  ): boolean;
   removeAllListeners(event?: EventKey): this;
 }
 
@@ -71,7 +97,8 @@ declare interface TypedEmitter {
 // ---------------------------------------------------------------------------
 
 class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
-  private readonly config: Required<Pick<WebRTCClientConfig, 'autoAccept'>> & WebRTCClientConfig;
+  private readonly config: Required<Pick<WebRTCClientConfig, 'autoAccept'>> &
+    WebRTCClientConfig;
   private _state: WebRTCState;
   private socket: Socket | null = null;
   private peer: SimplePeer.Instance | null = null;
@@ -115,8 +142,10 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
 
     this.setState({ signalingState: 'connecting', error: null });
 
+    const socketOpts = this.config.socketOptions ?? {};
     this.socket = io(this.config.signalingUrl, {
-      transports: ['websocket'],
+      ...socketOpts,
+      transports: socketOpts.transports ?? ['websocket'],
     });
 
     this.socket.on('connect', () => {
@@ -143,10 +172,14 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
 
   connectToPeer(targetSocketId: string): void {
     if (this._state.signalingState !== 'connected') {
-      throw new Error(`Cannot connect to peer: signaling is "${this._state.signalingState}"`);
+      throw new Error(
+        `Cannot connect to peer: signaling is "${this._state.signalingState}"`,
+      );
     }
     if (this._state.peerState !== 'idle') {
-      throw new Error(`Cannot connect to peer: peer state is "${this._state.peerState}"`);
+      throw new Error(
+        `Cannot connect to peer: peer state is "${this._state.peerState}"`,
+      );
     }
 
     this.setState({ peerId: targetSocketId });
@@ -155,7 +188,9 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
 
   acceptPeer(peerId: string): void {
     if (this._state.peerState !== 'idle') {
-      throw new Error(`Cannot accept peer: peer state is "${this._state.peerState}"`);
+      throw new Error(
+        `Cannot accept peer: peer state is "${this._state.peerState}"`,
+      );
     }
 
     this.setState({ peerId });
@@ -215,13 +250,15 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
   // ---- Private methods ----------------------------------------------------
 
   private createPeer(initiator: boolean): void {
-    const { peerOptions } = this.config;
+    const { peerOptions, onPeerCreated } = this.config;
 
     this.peer = new SimplePeer({
       initiator,
       trickle: true,
       ...peerOptions,
     });
+
+    onPeerCreated?.(this.peer);
 
     this.setState({ peerState: 'connecting' });
 
@@ -291,17 +328,25 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
   private deriveConnectionState(): ConnectionState {
     const { signalingState, peerState } = this._state;
 
-    if (signalingState === 'error' || peerState === 'error') return ConnectionState.FAILED;
+    if (signalingState === 'error' || peerState === 'error')
+      return ConnectionState.FAILED;
     if (peerState === 'connected') return ConnectionState.PEER_CONNECTED;
     if (peerState === 'connecting') return ConnectionState.PEER_CONNECTING;
     if (peerState === 'destroyed') return ConnectionState.DISCONNECTED;
-    if (signalingState === 'connected') return ConnectionState.SIGNALING_CONNECTED;
-    if (signalingState === 'connecting') return ConnectionState.SIGNALING_CONNECTING;
+    if (signalingState === 'connected')
+      return ConnectionState.SIGNALING_CONNECTED;
+    if (signalingState === 'connecting')
+      return ConnectionState.SIGNALING_CONNECTING;
     return ConnectionState.IDLE;
   }
 
   private setState(
-    partial: Partial<Pick<WebRTCState, 'signalingState' | 'peerState' | 'socketId' | 'peerId' | 'error'>>,
+    partial: Partial<
+      Pick<
+        WebRTCState,
+        'signalingState' | 'peerState' | 'socketId' | 'peerId' | 'error'
+      >
+    >,
   ): void {
     const prevSignaling = this._state.signalingState;
     const prevPeer = this._state.peerState;

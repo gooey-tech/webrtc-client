@@ -6,4 +6,5 @@ export {
   type WebRTCState,
   type WebRTCClientConfig,
   type WebRTCClientEvents,
+  type SocketIoClientOptions,
 } from './WebRTCClient';

@@ -72,12 +72,18 @@ The client exposes two independent state axes and one derived composite:
 ```typescript
 interface WebRTCClientConfig {
   signalingUrl: string;
-  peerOptions?: SimplePeer.Options; // ICE servers, streams, etc.
+  peerOptions?: SimplePeer.Options; // ICE servers, streams, trickle, etc.
   autoAccept?: boolean;             // default: true
+  socketOptions?: SocketIoClientOptions; // socket.io-client options (reconnection, auth, etc.)
+  onPeerCreated?: (peer: SimplePeer.Instance) => void; // after construction, before listeners
 }
 ```
 
 When `autoAccept` is `true` (default), incoming peer signals automatically create an answerer. Set to `false` to handle incoming connections manually via the `incomingPeer` event and `acceptPeer()`.
+
+**Socket.io options (`socketOptions`)** — Passed through to `io(url, options)`. If you omit `transports`, the client still defaults to `['websocket']`. Note: on every socket `disconnect`, this library destroys the peer and sets signaling to `disconnected`. Enabling socket.io `reconnection` alone does not restore app-level state; you may need extra logic if you want signaling to flip back to `connected` after an automatic reconnect.
+
+**React Native (`onPeerCreated`)** — Some React Native WebRTC stacks break `RTCPeerConnection.getStats` in ways that affect `simple-peer`. Use `onPeerCreated` to patch the underlying connection if your stack documents that pattern (e.g. stub `getStats`). The `_pc` field on `simple-peer` is not part of this package’s public API; access it only from your app code if needed. If `_pc` is not ready synchronously, defer with `queueMicrotask` or `setTimeout(0)` before patching.
 
 ### Methods
 
