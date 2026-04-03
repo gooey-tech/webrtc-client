@@ -59,7 +59,7 @@ The client exposes two independent state axes and one derived composite:
 | `PEER_CONNECTING` | WebRTC signaling in progress |
 | `PEER_CONNECTED` | Peer data channel open |
 | `DISCONNECTED` | Was connected, closed cleanly |
-| `FAILED` | Signaling or peer error |
+| `FAILED` | Signaling error (e.g. socket `connect_error`) |
 
 ### `signalingState`
 
@@ -68,6 +68,8 @@ The client exposes two independent state axes and one derived composite:
 ### `peerState`
 
 `idle` | `connecting` | `connected` | `destroyed` | `error`
+
+**Peer failures (recoverable):** When the `simple-peer` instance errors (other than a user-abort teardown), the client emits `error` with the `Error`, destroys the peer, and sets `peerState` back to `idle` while leaving signaling connected. The composite `ConnectionState` returns to `SIGNALING_CONNECTED` so you can call `connectToPeer` again without manually calling `disconnectPeer()` first.
 
 ## API
 

@@ -290,7 +290,8 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
     this.peer.on('error', (err: Error) => {
       const isAbort = /close called|user-initiated abort/i.test(err.message);
       if (!isAbort) {
-        this.setState({ peerState: 'error', error: err });
+        this.destroyPeer();
+        this.setState({ peerState: 'idle', peerId: null, error: null });
         this.emit('error', err);
       }
     });
@@ -325,9 +326,10 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
     this.pendingSignal = null;
   }
 
-  private deriveConnectionState(): ConnectionState {
-    const { signalingState, peerState } = this._state;
-
+  private deriveConnectionState(
+    signalingState: SignalingState,
+    peerState: PeerState,
+  ): ConnectionState {
     if (signalingState === 'error' || peerState === 'error')
       return ConnectionState.FAILED;
     if (peerState === 'connected') return ConnectionState.PEER_CONNECTED;
@@ -353,7 +355,10 @@ class WebRTCClient extends (EventEmitter as new () => TypedEmitter) {
     const prevConnection = this._state.connectionState;
 
     Object.assign(this._state, partial);
-    this._state.connectionState = this.deriveConnectionState();
+    this._state.connectionState = this.deriveConnectionState(
+      this._state.signalingState,
+      this._state.peerState,
+    );
 
     this.emit('stateChange', this.state);
 
