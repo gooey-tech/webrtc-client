@@ -1,5 +1,9 @@
 # @gooey-tech/webrtc-client
 
+[![npm version](https://img.shields.io/npm/v/@gooey-tech/webrtc-client.svg)](https://www.npmjs.com/package/@gooey-tech/webrtc-client)
+
+Package on npm: [@gooey-tech/webrtc-client](https://www.npmjs.com/package/@gooey-tech/webrtc-client)
+
 TypeScript WebRTC client with observable connection state, built on [simple-peer](https://github.com/feross/simple-peer) and [socket.io-client](https://socket.io/docs/v4/client-api/).
 
 Designed to pair with [gooey-tech/signaling-server](https://github.com/gooey-tech/signaling-server).
